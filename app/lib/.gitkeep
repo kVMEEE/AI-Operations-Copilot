@@ -1,0 +1,1 @@
+# Keep app/lib directory for compiled native binaries (aiops_core.dll / libaiops_core.so)

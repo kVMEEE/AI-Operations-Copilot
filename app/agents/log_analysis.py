@@ -1,45 +1,32 @@
-import re
 from typing import List
 from app.schemas.incident import LogPattern, LogAnalysisResult
+from app.core.cpp_bridge import cpp_bridge
 
 class LogAnalysisAgent:
-    def __init__(self):
-        self.common_patterns = [
-            (r"Connection timed out", "Network Timeout"),
-            (r"500 Internal Server Error", "Server Error"),
-            (r"Deadlock detected", "Database Deadlock"),
-            (r"OutOfMemoryError", "OOM Crash"),
-        ]
+    """
+    Log Analysis Agent powered by high-performance C++ pattern detection engine.
+    """
 
     def analyze(self, logs: List[str]) -> LogAnalysisResult:
-        patterns_found = {}
-        
-        for log in logs:
-            matched = False
-            for pattern_regex, label in self.common_patterns:
-                if re.search(pattern_regex, log, re.IGNORECASE):
-                    if label not in patterns_found:
-                        patterns_found[label] = {"count": 0, "severity": "High"}
-                    patterns_found[label]["count"] += 1
-                    matched = True
-                    break
-            
-            # Simple fallback for unknown errors
-            if not matched and "error" in log.lower():
-                label = "Generic Error"
-                if label not in patterns_found:
-                    patterns_found[label] = {"count": 0, "severity": "Medium"}
-                patterns_found[label]["count"] += 1
+        if not logs:
+            return LogAnalysisResult(patterns=[], total_logs=0, error_count=0, warning_count=0, engine=cpp_bridge.version)
 
-        results = []
-        for label, data in patterns_found.items():
-            results.append(LogPattern(
-                pattern=label,
-                frequency=data["count"],
-                severity=data["severity"]
-            ))
+        raw_res = cpp_bridge.analyze_logs(logs)
+
+        patterns = [
+            LogPattern(
+                pattern=p.get("pattern", "Unknown"),
+                frequency=p.get("frequency", 0),
+                severity=p.get("severity", "Medium"),
+                sample_lines=p.get("sample_lines", [])
+            )
+            for p in raw_res.get("patterns", [])
+        ]
 
         return LogAnalysisResult(
-            patterns=results,
-            total_logs=len(logs)
+            patterns=patterns,
+            total_logs=raw_res.get("total_logs", len(logs)),
+            error_count=raw_res.get("error_count", 0),
+            warning_count=raw_res.get("warning_count", 0),
+            engine=cpp_bridge.version
         )

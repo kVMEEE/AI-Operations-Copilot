@@ -1,37 +1,35 @@
-from typing import Dict, Any, List
+from typing import Dict, Any
 from app.schemas.incident import MetricsAnalysisResult, MetricAnomaly
+from app.core.cpp_bridge import cpp_bridge
 
 class MetricsAnalysisAgent:
-    def __init__(self):
-        # Define simple thresholds for demonstration
-        self.thresholds = {
-            "cpu_usage": 80.0,
-            "memory_usage": 85.0,
-            "latency_ms": 1000.0,
-            "error_rate": 0.05
-        }
+    """
+    Metrics Analysis Agent powered by high-performance C++ statistical anomaly detector.
+    """
 
     def analyze(self, metrics: Dict[str, Any]) -> MetricsAnalysisResult:
-        anomalies = []
+        if not metrics:
+            return MetricsAnalysisResult(anomalies=[], total_metrics_evaluated=0, has_critical_anomaly=False, engine=cpp_bridge.version)
 
-        for metric_name, value in metrics.items():
-            # Handle list of values (time series) - take max for simplicity
-            current_val = value
-            if isinstance(value, list):
-                current_val = max([float(v) for v in value]) if value else 0
-            else:
-                try:
-                    current_val = float(value)
-                except (ValueError, TypeError):
-                    continue # Skip non-numeric
+        raw_res = cpp_bridge.analyze_metrics(metrics)
 
-            threshold = self.thresholds.get(metric_name)
-            if threshold and current_val > threshold:
-                anomalies.append(MetricAnomaly(
-                    metric_name=metric_name,
-                    value=current_val,
-                    threshold=threshold,
-                    description=f"Metric {metric_name} ({current_val}) exceeded threshold ({threshold})"
-                ))
+        anomalies = [
+            MetricAnomaly(
+                metric_name=a.get("metric_name", "unknown"),
+                timestamp=a.get("timestamp"),
+                value=float(a.get("value", 0.0)),
+                peak_value=float(a.get("peak_value", a.get("value", 0.0))),
+                threshold=float(a.get("threshold", 0.0)),
+                z_score=float(a.get("z_score", 0.0)),
+                severity=a.get("severity", "High"),
+                description=a.get("description", "")
+            )
+            for a in raw_res.get("anomalies", [])
+        ]
 
-        return MetricsAnalysisResult(anomalies=anomalies)
+        return MetricsAnalysisResult(
+            anomalies=anomalies,
+            total_metrics_evaluated=raw_res.get("total_metrics_evaluated", len(metrics)),
+            has_critical_anomaly=raw_res.get("has_critical_anomaly", False),
+            engine=cpp_bridge.version
+        )

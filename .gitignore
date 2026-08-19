@@ -1,4 +1,23 @@
+# Python
 .venv/
+venv/
+ENV/
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Environment & Databases
 .env
 *.db
+*.sqlite3
+
+# C++ Build Artifacts
+cpp_engine/build/
+*.o
+*.obj
+
+# OS
+.DS_Store
+Thumbs.db

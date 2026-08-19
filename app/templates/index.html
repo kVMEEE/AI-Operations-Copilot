@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Operations Copilot — 100% C++ & Python Platform</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+
+    <!-- Header Navigation -->
+    <header class="header">
+        <div class="header-container">
+            <a href="#" class="logo-area" onclick="showView('dashboard')">
+                <div class="logo-icon">⚡</div>
+                <div class="logo-text">AI Operations Copilot</div>
+            </a>
+            <div style="display: flex; align-items: center; gap: 1.5rem;">
+                <span class="badge-engine" id="header-engine-badge">C++17 Native Engine Active</span>
+                <nav class="nav-links">
+                    <button class="nav-btn active" data-view="dashboard" onclick="showView('dashboard')">
+                        📊 Incidents
+                    </button>
+                    <button class="nav-btn" data-view="new" onclick="showView('new')">
+                        ➕ New Incident
+                    </button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+
+        <!-- VIEW 1: Dashboard / Incidents Table -->
+        <section id="view-dashboard">
+            <div class="section-title">
+                <h2>Active Incident Stream</h2>
+                <button class="btn-primary" onclick="showView('new')">
+                    ➕ Analyze New Incident
+                </button>
+            </div>
+
+            <div class="glass-card">
+                <table class="incidents-table">
+                    <thead>
+                        <tr>
+                            <th>Incident ID</th>
+                            <th>Description / Cause</th>
+                            <th>Status</th>
+                            <th>Current Agent Step</th>
+                            <th>Timestamp</th>
+                        </tr>
+                    </thead>
+                    <tbody id="incidents-tbody">
+                        <tr>
+                            <td colspan="5" style="text-align: center; color: var(--text-dim); padding: 3rem;">
+                                Loading telemetry streams...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- VIEW 2: New Incident Studio Form -->
+        <section id="view-new" style="display: none;">
+            <div class="section-title">
+                <h2>Incident Analysis Studio</h2>
+            </div>
+
+            <div class="glass-card">
+                <div class="presets-bar">
+                    <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">⚡ Quick Incident Presets:</span>
+                    <button type="button" class="preset-btn" onclick="loadPreset('database')">🗄️ Database Lock & Latency</button>
+                    <button type="button" class="preset-btn" onclick="loadPreset('memory')">🧠 OOM Spike & Crash</button>
+                    <button type="button" class="preset-btn" onclick="loadPreset('network')">🌐 Network Gateway Timeout</button>
+                </div>
+
+                <form onsubmit="submitIncident(event)">
+                    <div class="form-group">
+                        <label class="form-label" for="input-desc">Incident Description</label>
+                        <input type="text" id="input-desc" class="form-input" required placeholder="e.g. API 500 spike coinciding with database timeouts">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="input-logs">Application Logs (C++ Pattern Detection)</label>
+                        <textarea id="input-logs" class="form-textarea" rows="6" placeholder="Paste server/worker log lines..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="input-metrics">Telemetry Metrics (JSON Series / Values for C++ Z-Score Spike Detection)</label>
+                        <textarea id="input-metrics" class="form-textarea" rows="6" placeholder='{"cpu_usage": [40, 95], "latency_ms": [100, 3500]}'></textarea>
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem;">
+                        <button type="button" class="nav-btn" onclick="showView('dashboard')">Cancel</button>
+                        <button type="submit" id="submit-btn" class="btn-primary">
+                            🚀 Run Incident Analysis
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- VIEW 3: Incident Details & Live Stepper -->
+        <section id="view-details" style="display: none;">
+            <div class="section-title">
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <button class="nav-btn" onclick="showView('dashboard')">← Back</button>
+                    <h2>Incident <span id="details-job-id" style="font-family: var(--font-mono); color: #60a5fa;"></span></h2>
+                </div>
+                <span id="details-status-badge" class="status-badge status-processing">PROCESSING</span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 340px 1fr; gap: 1.75rem; align-items: start;">
+                
+                <!-- Left: Live Pipeline Stepper -->
+                <div class="glass-card">
+                    <h3 style="margin-bottom: 1.25rem; font-size: 1.1rem; color: #93c5fd;">Agent Pipeline Progress</h3>
+                    <div class="stepper">
+                        <div id="step-analyzing_logs" class="step-item">
+                            <div class="step-icon">1</div>
+                            <div>
+                                <div style="font-weight: 600; font-size: 0.9rem;">C++ Log Analyzer</div>
+                                <div style="font-size: 0.75rem; color: var(--text-dim);">Fast pattern clustering</div>
+                            </div>
+                        </div>
+
+                        <div id="step-analyzing_metrics" class="step-item">
+                            <div class="step-icon">2</div>
+                            <div>
+                                <div style="font-weight: 600; font-size: 0.9rem;">C++ Metrics Detector</div>
+                                <div style="font-size: 0.75rem; color: var(--text-dim);">Statistical Z-score spikes</div>
+                            </div>
+                        </div>
+
+                        <div id="step-inferring_root_cause" class="step-item">
+                            <div class="step-icon">3</div>
+                            <div>
+                                <div style="font-weight: 600; font-size: 0.9rem;">Root Cause Agent</div>
+                                <div style="font-size: 0.75rem; color: var(--text-dim);">C++ heuristic correlation</div>
+                            </div>
+                        </div>
+
+                        <div id="step-generating_recommendations" class="step-item">
+                            <div class="step-icon">4</div>
+                            <div>
+                                <div style="font-weight: 600; font-size: 0.9rem;">Recommendation Agent</div>
+                                <div style="font-size: 0.75rem; color: var(--text-dim);">Safe diagnostic actions</div>
+                            </div>
+                        </div>
+
+                        <div id="step-finalizing_report" class="step-item">
+                            <div class="step-icon">5</div>
+                            <div>
+                                <div style="font-weight: 600; font-size: 0.9rem;">Report Generator</div>
+                                <div style="font-size: 0.75rem; color: var(--text-dim);">Postmortem document</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Report & Debug Inspector -->
+                <div class="glass-card" style="min-height: 550px;">
+                    <div class="tabs-header">
+                        <button class="tab-btn active" data-tab="report" onclick="switchDetailTab('report')">📑 Postmortem Report</button>
+                        <button class="tab-btn" data-tab="debug" onclick="switchDetailTab('debug')">🔍 Raw Debug JSON</button>
+                    </div>
+
+                    <div id="tab-report">
+                        <div id="report-content-box" class="postmortem-viewer">
+                            <p style="color: var(--text-dim);">Initializing analysis...</p>
+                        </div>
+                    </div>
+
+                    <div id="tab-debug" style="display: none;">
+                        <pre id="debug-content-box" style="background: rgba(10, 15, 29, 0.9); padding: 1.25rem; border-radius: 8px; font-family: var(--font-mono); font-size: 0.8rem; color: #38bdf8; overflow-x: auto; max-height: 550px;"></pre>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
