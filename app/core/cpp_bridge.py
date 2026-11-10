@@ -29,6 +29,8 @@ class CppEngineBridge:
             "aiops_core.dll"
         ]
 
+        if sys.platform != "win32":
+            candidates = [p for p in candidates if not p.endswith(".dll")]
         for path in candidates:
             if os.path.exists(path):
                 try:
@@ -70,6 +72,17 @@ class CppEngineBridge:
         # aiops_free_string
         self._lib.aiops_free_string.restype = None
         self._lib.aiops_free_string.argtypes = [ctypes.c_void_p]
+
+    def analyze_incident(self, logs, metrics):
+        if self._is_native and hasattr(self._lib, "aiops_analyze_incident"):
+            fn = self._lib.aiops_analyze_incident
+            fn.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+            fn.restype = ctypes.c_void_p
+            result = json.loads(self._read_and_free_c_str(fn(
+                json.dumps(logs, ensure_ascii=False).encode(), json.dumps(metrics).encode())))
+            return result, "native"
+        from app.investigation.analytics import fallback
+        return fallback(logs, metrics), "python_fallback"
 
     def _read_and_free_c_str(self, ptr: Optional[int]) -> Optional[str]:
         if not ptr:

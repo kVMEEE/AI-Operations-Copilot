@@ -58,6 +58,8 @@ static std::vector<std::string> parse_json_string_array(const std::string& json_
                     if (c == 'n') current += '\n';
                     else if (c == 't') current += '\t';
                     else if (c == 'r') current += '\r';
+                    else if (c == 'b') current += '\b';
+                    else if (c == 'f') current += '\f';
                     else if (c == '"') current += '"';
                     else if (c == '\\') current += '\\';
                     else current += c;
@@ -74,16 +76,14 @@ static std::vector<std::string> parse_json_string_array(const std::string& json_
                 }
                 i++;
             }
-            if (!current.empty()) {
-                lines.push_back(current);
-            }
+            lines.push_back(current);
         } else {
             i++;
         }
     }
 
     // Fallback: If not a JSON array, split by newline
-    if (lines.empty() && !json_str.empty()) {
+    if (lines.empty() && !json_str.empty() && json_str.front() != '[') {
         std::stringstream ss(json_str);
         std::string item;
         while (std::getline(ss, item)) {
@@ -127,7 +127,7 @@ static std::map<std::string, std::vector<double>> parse_json_metrics(const std::
                     std::string num_str;
                     while (i < json_str.size() && json_str[i] != ']') {
                         char c = json_str[i];
-                        if ((c >= '0' && c <= '9') || c == '.' || c == '-' || c == '+') {
+                        if ((c >= '0' && c <= '9') || c == '.' || c == '-' || c == '+' || c == 'e' || c == 'E') {
                             num_str += c;
                         } else if (c == ',' || c == ' ' || c == '\t' || c == '\n') {
                             if (!num_str.empty()) {
@@ -152,10 +152,10 @@ static std::map<std::string, std::vector<double>> parse_json_metrics(const std::
                         char c = json_str[i];
                         if (in_quotes) {
                             if (c == '"') { i++; break; }
-                            if ((c >= '0' && c <= '9') || c == '.' || c == '-' || c == '+') num_str += c;
+                            if ((c >= '0' && c <= '9') || c == '.' || c == '-' || c == '+' || c == 'e' || c == 'E') num_str += c;
                         } else {
                             if (c == ',' || c == '}' || c == ' ' || c == '\n') break;
-                            if ((c >= '0' && c <= '9') || c == '.' || c == '-' || c == '+') num_str += c;
+                            if ((c >= '0' && c <= '9') || c == '.' || c == '-' || c == '+' || c == 'e' || c == 'E') num_str += c;
                         }
                         i++;
                     }
@@ -175,19 +175,7 @@ static std::map<std::string, std::vector<double>> parse_json_metrics(const std::
     return metrics_map;
 }
 
-extern "C" {
-
-AIOPS_API const char* aiops_get_version() {
-    return "AI-Operations-Copilot C++ Core v2.0 (x86_64 C++17 Engine)";
-}
-
-AIOPS_API const char* aiops_analyze_logs(const char* logs_json) {
-    if (!logs_json) return duplicate_string("{\"patterns\":[],\"total_logs\":0,\"error_count\":0}");
-
-    auto lines = parse_json_string_array(logs_json);
-    aiops::LogAnalyzer analyzer;
-    auto result = analyzer.analyze(lines);
-
+static std::string serialize_logs(const aiops::LogAnalysisResult& result) {
     std::ostringstream json;
     json << "{\n";
     json << "  \"total_logs\": " << result.total_logs << ",\n";
@@ -213,16 +201,10 @@ AIOPS_API const char* aiops_analyze_logs(const char* logs_json) {
     json << "  ]\n";
     json << "}";
 
-    return duplicate_string(json.str());
+    return json.str();
 }
 
-AIOPS_API const char* aiops_analyze_metrics(const char* metrics_json) {
-    if (!metrics_json) return duplicate_string("{\"anomalies\":[],\"total_metrics_evaluated\":0}");
-
-    auto metrics_data = parse_json_metrics(metrics_json);
-    aiops::MetricsAnalyzer analyzer;
-    auto result = analyzer.analyze(metrics_data);
-
+static std::string serialize_metrics(const aiops::MetricsAnalysisResult& result) {
     std::ostringstream json;
     json << "{\n";
     json << "  \"total_metrics_evaluated\": " << result.total_metrics_evaluated << ",\n";
@@ -245,7 +227,50 @@ AIOPS_API const char* aiops_analyze_metrics(const char* metrics_json) {
     json << "  ]\n";
     json << "}";
 
-    return duplicate_string(json.str());
+    return json.str();
+}
+
+static std::string serialize_cause(const aiops::CorrelatedRootCause& root_cause) {
+    std::ostringstream json;
+    json << "{\n";
+    json << "  \"cause\": \"" << escape_json(root_cause.cause) << "\",\n";
+    json << "  \"confidence_score\": " << std::fixed << std::setprecision(2) << root_cause.confidence_score << ",\n";
+    json << "  \"primary_category\": \"" << escape_json(root_cause.primary_category) << "\",\n";
+    json << "  \"reasoning\": \"" << escape_json(root_cause.reasoning) << "\",\n";
+    json << "  \"contributing_factors\": [";
+    for (size_t i = 0; i < root_cause.contributing_factors.size(); ++i) {
+        json << "\"" << escape_json(root_cause.contributing_factors[i]) << "\"";
+        if (i + 1 < root_cause.contributing_factors.size()) json << ", ";
+    }
+    json << "]\n";
+    json << "}";
+
+    return json.str();
+}
+extern "C" {
+
+AIOPS_API const char* aiops_get_version() {
+    return "AI-Operations-Copilot C++ Core v2.0 (x86_64 C++17 Engine)";
+}
+
+AIOPS_API const char* aiops_analyze_logs(const char* logs_json) {
+    if (!logs_json) return duplicate_string("{\"patterns\":[],\"total_logs\":0,\"error_count\":0}");
+
+    auto lines = parse_json_string_array(logs_json);
+    aiops::LogAnalyzer analyzer;
+    auto result = analyzer.analyze(lines);
+
+    return duplicate_string(serialize_logs(result));
+}
+
+AIOPS_API const char* aiops_analyze_metrics(const char* metrics_json) {
+    if (!metrics_json) return duplicate_string("{\"anomalies\":[],\"total_metrics_evaluated\":0}");
+
+    auto metrics_data = parse_json_metrics(metrics_json);
+    aiops::MetricsAnalyzer analyzer;
+    auto result = analyzer.analyze(metrics_data);
+
+    return duplicate_string(serialize_metrics(result));
 }
 
 AIOPS_API const char* aiops_correlate(const char* logs_json, const char* metrics_json) {
@@ -261,21 +286,14 @@ AIOPS_API const char* aiops_correlate(const char* logs_json, const char* metrics
     aiops::Correlator correlator;
     auto root_cause = correlator.correlate(log_result, metrics_result);
 
-    std::ostringstream json;
-    json << "{\n";
-    json << "  \"cause\": \"" << escape_json(root_cause.cause) << "\",\n";
-    json << "  \"confidence_score\": " << std::fixed << std::setprecision(2) << root_cause.confidence_score << ",\n";
-    json << "  \"primary_category\": \"" << escape_json(root_cause.primary_category) << "\",\n";
-    json << "  \"reasoning\": \"" << escape_json(root_cause.reasoning) << "\",\n";
-    json << "  \"contributing_factors\": [";
-    for (size_t i = 0; i < root_cause.contributing_factors.size(); ++i) {
-        json << "\"" << escape_json(root_cause.contributing_factors[i]) << "\"";
-        if (i + 1 < root_cause.contributing_factors.size()) json << ", ";
-    }
-    json << "]\n";
-    json << "}";
+    return duplicate_string(serialize_cause(root_cause));
+}
 
-    return duplicate_string(json.str());
+AIOPS_API const char* aiops_analyze_incident(const char* logs_json, const char* metrics_json) {
+    auto logs = aiops::LogAnalyzer().analyze(parse_json_string_array(logs_json ? logs_json : "[]"));
+    auto metrics = aiops::MetricsAnalyzer().analyze(parse_json_metrics(metrics_json ? metrics_json : "{}"));
+    auto cause = aiops::Correlator().correlate(logs, metrics);
+    return duplicate_string("{\"logs\":" + serialize_logs(logs) + ",\"metrics\":" + serialize_metrics(metrics) + ",\"correlation\":" + serialize_cause(cause) + "}");
 }
 
 AIOPS_API void aiops_free_string(const char* ptr) {

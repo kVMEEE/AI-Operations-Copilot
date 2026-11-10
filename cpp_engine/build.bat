@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0"
 echo ========================================================
 echo Building AI Operations Copilot C++ Core Engine
 echo ========================================================

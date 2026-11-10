@@ -444,3 +444,10 @@ body {
     border-radius: 0 6px 6px 0;
     margin: 1rem 0;
 }
+/* Evidence inspection keeps long untrusted values inside the viewport. */
+pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+section.glass-card { margin: 1.5rem 0; }
+label { display: block; margin-top: 1rem; }
+#history button { display: block; margin: .6rem 0; padding: .6rem; text-align: left; }
+#error { color: #fca5a5; }
+select { padding: .65rem; margin: 1rem; }

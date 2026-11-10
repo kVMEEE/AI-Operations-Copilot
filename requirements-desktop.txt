@@ -1,2 +1,2 @@
 -r requirements.txt
-PyQt6>=6.5.0
+PyQt6==6.12.0

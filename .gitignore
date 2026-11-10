@@ -21,3 +21,10 @@ cpp_engine/build/
 # OS
 .DS_Store
 Thumbs.db
+
+# SQLite WAL and generated knowledge index
+*.db-wal
+*.db-shm
+*.sqlite3-wal
+*.sqlite3-shm
+data/

@@ -1,12 +1,7 @@
-#!/usr/bin/env bash
-# exit on error
-set -o errexit
-
-echo "===> Installing Python dependencies..."
-pip install --upgrade pip
-pip install -r requirements.txt
-
-echo "===> Compiling C++17 Core Analytics Engine..."
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")"
+python -m pip install -r requirements.txt
 make -C cpp_engine
-
-echo "===> Render Build Completed Successfully!"
+python -m app.investigation.cli init-db
+python -m app.investigation.cli index

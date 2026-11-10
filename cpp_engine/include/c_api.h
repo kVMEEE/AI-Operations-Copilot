@@ -44,6 +44,8 @@ AIOPS_API const char* aiops_correlate(const char* logs_json, const char* metrics
 /**
  * Free string allocated by the C++ engine.
  */
+AIOPS_API const char* aiops_analyze_incident(const char* logs_json, const char* metrics_json);
+
 AIOPS_API void aiops_free_string(const char* ptr);
 
 #ifdef __cplusplus
