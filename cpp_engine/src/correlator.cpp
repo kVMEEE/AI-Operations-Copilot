@@ -26,7 +26,6 @@ CorrelatedRootCause Correlator::correlate(const LogAnalysisResult& logs, const M
     bool high_latency = false;
     bool high_cpu = false;
     bool high_mem = false;
-    bool high_err = false;
     bool high_disk = false;
     bool high_net_drop = false;
 
@@ -34,7 +33,6 @@ CorrelatedRootCause Correlator::correlate(const LogAnalysisResult& logs, const M
         if (a.metric_name.find("latency") != std::string::npos) high_latency = true;
         if (a.metric_name.find("cpu") != std::string::npos) high_cpu = true;
         if (a.metric_name.find("memory") != std::string::npos) high_mem = true;
-        if (a.metric_name.find("error") != std::string::npos) high_err = true;
         if (a.metric_name.find("disk") != std::string::npos) high_disk = true;
         if (a.metric_name.find("network") != std::string::npos) high_net_drop = true;
     }
@@ -81,7 +79,7 @@ CorrelatedRootCause Correlator::correlate(const LogAnalysisResult& logs, const M
         rc.cause = "Upstream Network Latency / Dependency Timeout";
         rc.primary_category = "Network";
         rc.confidence_score = (has_net_logs && high_latency) ? 0.89 : 0.78;
-        rc.reasoning = "Upstream connection timeouts and network socket degradation coincided with service error rate increases.";
+        rc.reasoning = "Network timeout signatures or network drop anomalies suggest dependency connectivity degradation.";
         if (has_net_logs) rc.contributing_factors.push_back("Network timeout log events");
         if (high_net_drop) rc.contributing_factors.push_back("Packet/socket drops in telemetry");
         return rc;
@@ -92,7 +90,7 @@ CorrelatedRootCause Correlator::correlate(const LogAnalysisResult& logs, const M
         rc.cause = "Disk Volume Space Exhaustion";
         rc.primary_category = "Disk";
         rc.confidence_score = 0.94;
-        rc.reasoning = "Local disk volume utilization reached 100% capacity preventing write operations.";
+        rc.reasoning = "Disk error signatures or utilization threshold breaches suggest disk pressure; capacity and write impact require confirmation.";
         if (has_disk_logs) rc.contributing_factors.push_back("Disk write failure logs");
         if (high_disk) rc.contributing_factors.push_back("Disk utilization metric threshold breach");
         return rc;
@@ -103,7 +101,7 @@ CorrelatedRootCause Correlator::correlate(const LogAnalysisResult& logs, const M
         rc.cause = "CPU & Thread Pool Starvation";
         rc.primary_category = "CPU";
         rc.confidence_score = (high_cpu && has_thread_logs) ? 0.88 : 0.74;
-        rc.reasoning = "Excessive CPU load caused thread queue backlog and request queue latency.";
+        rc.reasoning = "CPU threshold breaches or thread rejection logs suggest resource pressure; causal impact requires confirmation.";
         if (high_cpu) rc.contributing_factors.push_back("High CPU utilization anomaly");
         if (has_thread_logs) rc.contributing_factors.push_back("Thread pool rejection logs");
         return rc;

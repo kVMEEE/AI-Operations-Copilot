@@ -1,0 +1,202 @@
+{
+  "mode": "offline_deterministic",
+  "category_agreement": {
+    "correct": 11,
+    "total": 11
+  },
+  "lexical_document_recall_at_4": {
+    "hits": 8,
+    "queries": 8,
+    "recall": 1.0
+  },
+  "results": [
+    {
+      "id": "database",
+      "expected": "Database",
+      "actual": "Database",
+      "schema_valid": true,
+      "citation_valid": true,
+      "citation_count": 0,
+      "abstained": false,
+      "verification": {
+        "status": "passed",
+        "reasons": [],
+        "semantic_support_proven": false
+      },
+      "latency_ms": 16.797536998637952,
+      "usage": {},
+      "provider": "deterministic"
+    },
+    {
+      "id": "oom",
+      "expected": "Memory",
+      "actual": "Memory",
+      "schema_valid": true,
+      "citation_valid": true,
+      "citation_count": 0,
+      "abstained": false,
+      "verification": {
+        "status": "passed",
+        "reasons": [],
+        "semantic_support_proven": false
+      },
+      "latency_ms": 14.706302999911713,
+      "usage": {},
+      "provider": "deterministic"
+    },
+    {
+      "id": "network",
+      "expected": "Network",
+      "actual": "Network",
+      "schema_valid": true,
+      "citation_valid": true,
+      "citation_count": 0,
+      "abstained": false,
+      "verification": {
+        "status": "passed",
+        "reasons": [],
+        "semantic_support_proven": false
+      },
+      "latency_ms": 14.423927999814623,
+      "usage": {},
+      "provider": "deterministic"
+    },
+    {
+      "id": "disk",
+      "expected": "Disk",
+      "actual": "Disk",
+      "schema_valid": true,
+      "citation_valid": true,
+      "citation_count": 0,
+      "abstained": false,
+      "verification": {
+        "status": "passed",
+        "reasons": [],
+        "semantic_support_proven": false
+      },
+      "latency_ms": 14.231287999791675,
+      "usage": {},
+      "provider": "deterministic"
+    },
+    {
+      "id": "cpu",
+      "expected": "CPU",
+      "actual": "CPU",
+      "schema_valid": true,
+      "citation_valid": true,
+      "citation_count": 0,
+      "abstained": false,
+      "verification": {
+        "status": "passed",
+        "reasons": [],
+        "semantic_support_proven": false
+      },
+      "latency_ms": 15.14201600002707,
+      "usage": {},
+      "provider": "deterministic"
+    },
+    {
+      "id": "healthy",
+      "expected": "None",
+      "actual": "None",
+      "schema_valid": true,
+      "citation_valid": true,
+      "citation_count": 0,
+      "abstained": false,
+      "verification": {
+        "status": "passed",
+        "reasons": [],
+        "semantic_support_proven": false
+      },
+      "latency_ms": 16.232234998824424,
+      "usage": {},
+      "provider": "deterministic"
+    },
+    {
+      "id": "conflicting",
+      "expected": "Memory",
+      "actual": "Memory",
+      "schema_valid": true,
+      "citation_valid": true,
+      "citation_count": 0,
+      "abstained": false,
+      "verification": {
+        "status": "passed",
+        "reasons": [],
+        "semantic_support_proven": false
+      },
+      "latency_ms": 15.477355998882558,
+      "usage": {},
+      "provider": "deterministic"
+    },
+    {
+      "id": "insufficient",
+      "expected": "Unknown",
+      "actual": "Unknown",
+      "schema_valid": true,
+      "citation_valid": true,
+      "citation_count": 0,
+      "abstained": true,
+      "verification": {
+        "status": "passed",
+        "reasons": [],
+        "semantic_support_proven": false
+      },
+      "latency_ms": 15.0462419987889,
+      "usage": {},
+      "provider": "deterministic"
+    },
+    {
+      "id": "misleading",
+      "expected": "CPU",
+      "actual": "CPU",
+      "schema_valid": true,
+      "citation_valid": true,
+      "citation_count": 0,
+      "abstained": false,
+      "verification": {
+        "status": "passed",
+        "reasons": [],
+        "semantic_support_proven": false
+      },
+      "latency_ms": 15.192347000265727,
+      "usage": {},
+      "provider": "deterministic"
+    },
+    {
+      "id": "injection",
+      "expected": "Disk",
+      "actual": "Disk",
+      "schema_valid": true,
+      "citation_valid": true,
+      "citation_count": 0,
+      "abstained": false,
+      "verification": {
+        "status": "passed",
+        "reasons": [],
+        "semantic_support_proven": false
+      },
+      "latency_ms": 16.12963999832573,
+      "usage": {},
+      "provider": "deterministic"
+    },
+    {
+      "id": "missing_runbooks",
+      "expected": "Unknown",
+      "actual": "Unknown",
+      "schema_valid": true,
+      "citation_valid": true,
+      "citation_count": 0,
+      "abstained": true,
+      "verification": {
+        "status": "passed",
+        "reasons": [],
+        "semantic_support_proven": false
+      },
+      "latency_ms": 16.03284500015434,
+      "usage": {},
+      "provider": "deterministic"
+    }
+  ],
+  "limitations": "Synthetic fixtures are not production accuracy estimates. Empty citations do not establish faithfulness. Semantic embedding quality requires a separately labelled live evaluation."
+}

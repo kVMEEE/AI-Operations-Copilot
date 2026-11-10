@@ -1,5 +1,16 @@
 import os
+import platform
+from contextlib import asynccontextmanager
+from app.core.workflow import planner
+
+@asynccontextmanager
+async def lifespan(app):
+    planner.initialize()
+    yield
+    await planner.shutdown()
+
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
@@ -9,9 +20,18 @@ from app.core.cpp_bridge import cpp_bridge
 from app.routers import incidents, health, analyze
 
 app = FastAPI(
-    title=f"{settings.PROJECT_NAME} (100% C++ & Python)",
+    lifespan=lifespan,
+    title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(request, exc):
+    # Do not echo raw malformed incident input or credential-like strings.
+    return JSONResponse(status_code=422, content={"detail": [
+        {"loc": list(error["loc"]), "type": error["type"], "msg": "Invalid incident input"}
+        for error in exc.errors()
+    ]})
 
 # CORS Middleware configuration
 if settings.BACKEND_CORS_ORIGINS:
@@ -47,7 +67,7 @@ def serve_dashboard():
 def engine_info():
     return {
         "engine": cpp_bridge.version,
-        "is_native": cpp_bridge.is_native,
+        "is_native": cpp_bridge.is_native and hasattr(cpp_bridge._lib, "aiops_analyze_incident"),
         "architecture": "100% C++17 Core Analytics & Python Async Orchestrator",
-        "stack": ["C++17 (g++)", "Python 3.13", "FastAPI", "Uvicorn"]
+        "stack": ["C++17 (g++)", f"Python {platform.python_version()}", "FastAPI", "Uvicorn"]
     }

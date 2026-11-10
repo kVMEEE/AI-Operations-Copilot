@@ -24,11 +24,9 @@ except ImportError:
     sys.exit(1)
 
 from app.core.cpp_bridge import cpp_bridge
-from app.agents.log_analysis import LogAnalysisAgent
-from app.agents.metrics_analysis import MetricsAnalysisAgent
-from app.agents.root_cause import RootCauseAgent
-from app.agents.recommendation import RecommendationAgent
-from app.agents.report_generator import ReportGeneratorAgent
+from app.core.workflow import PlannerAgent
+from app.schemas.incident import IncidentCreate
+import asyncio
 
 class WorkerSignals(QObject):
     progress = pyqtSignal(int, str)
@@ -41,6 +39,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"AI Operations Copilot — {cpp_bridge.version}")
         self.resize(1100, 750)
         self.init_ui()
+        self.signals = WorkerSignals()
+        self.signals.finished.connect(self.receive_result)
+        self.signals.error.connect(self.receive_error)
 
     def init_ui(self):
         # Apply dark theme
@@ -171,23 +172,31 @@ class MainWindow(QMainWindow):
         # Run synchronously in background thread
         def task():
             try:
-                log_res = LogAnalysisAgent().analyze(logs)
-                metrics_res = MetricsAnalysisAgent().analyze(metrics)
-                rc = RootCauseAgent().analyze(log_res, metrics_res, raw_logs=logs, raw_metrics=metrics)
-                recs = RecommendationAgent().recommend(rc)
-                rep = ReportGeneratorAgent().generate(desc, rc, recs, log_res, metrics_res, cpp_bridge.version)
-                
-                # Update UI in main thread
-                QTimer.singleShot(0, lambda: self.display_result(rep))
-            except Exception as e:
-                QTimer.singleShot(0, lambda: QMessageBox.critical(self, "Error", str(e)))
-                QTimer.singleShot(0, lambda: self.run_btn.setEnabled(True))
+                async def analyze():
+                    service = PlannerAgent()
+                    try:
+                        return await service.analyze(IncidentCreate(description=desc,logs=logs,metrics=metrics))
+                    finally:
+                        await service.shutdown()
+                result = asyncio.run(analyze())
+                if result.status != "completed": raise RuntimeError(result.error or result.status)
+                self.signals.finished.emit(result.result.model_dump(mode="json"))
+            except Exception as exc:
+                self.signals.error.emit(type(exc).__name__)
 
         threading.Thread(target=task, daemon=True).start()
 
+    def receive_result(self, payload):
+        from app.schemas.incident import ReportContent
+        self.display_result(ReportContent.model_validate(payload))
+
+    def receive_error(self, message):
+        self.status_label.setText(message)
+        self.run_btn.setEnabled(True)
+
     def display_result(self, report):
         self.progress_bar.setValue(100)
-        self.status_label.setText("Analysis Complete ✅")
+        self.status_label.setText(f"Analysis completed — {report.investigation.findings.engine} / {report.investigation.retrieval_mode} / {report.investigation.provider.active}")
         self.run_btn.setEnabled(True)
 
         self.report_view.setPlainText(report.summary)

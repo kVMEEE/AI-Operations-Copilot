@@ -1,26 +1,21 @@
 # Evidence-grounded investigation upgrade
 
-Baseline: original C++/Python application; feature branch created. Existing tests run before changes.
+Continued on `feature/evidence-investigation`, preserving initial commit `5c6cb50`.
 
-- [x] Inspect existing schemas, workflow, native bridge, API and build configuration
-- [ ] Complete first-party code audit and official API documentation review
-- [ ] Single-pass analytics and validated evidence contracts
-- [ ] Real bounded LangChain provider integration
-- [ ] Persistent hybrid retrieval and knowledge fixtures
-- [ ] Bounded LangGraph tool investigation and verification
-- [ ] Persistent job lifecycle and shared service
-- [ ] Safe dashboard and desktop compatibility
-- [ ] Offline tests, evaluation and browser smoke
-- [ ] Reproducible installation and documentation
-- [ ] Final diff review, commit and draft PR
+- [x] Inspect first-party application/native/UI code and run baseline checks
+- [x] Review official maintained integration source documentation
+- [x] Single-pass native analytics, explicit Python fallback and typed evidence
+- [x] Real configurable LangChain OpenAI integration with structured responses and budgets
+- [x] Persistent heading-aware lexical/vector index and provenance-preserving hybrid retrieval
+- [x] Bounded LangGraph tool loop, ownership validation, verification and one revision
+- [x] Shared service, SQLite jobs/stages/results, cancellation and restart recovery
+- [x] Dashboard evidence/hypotheses/citations/traces/modes and sanitized Markdown
+- [x] Desktop shared-service integration and offscreen smoke
+- [x] Offline tests, synthetic/fake-provider evaluation and real Chromium smoke
+- [x] Pinned dependencies, fresh install, Docker build and HTTP smoke
+- [x] Architecture, setup, security, limits and requirement reconciliation documentation
+- [ ] Live provider/embedding service verification — blocked: no API credentials
+- [ ] Windows execution — unavailable in this Linux environment
+- [ ] Final commit, push and draft PR — delivery results recorded at completion
 
-No live provider calls authorized for real incident data. Synthetic live checks only, when credentials are available. No deployment or public exposure.
-
-## Validation of initial changes
-
-Both documented integration scripts passed before and after these changes.
-Manual validation rejected booleans, strings, objects, empty series, NaN and mixed metric series, and accepted finite numeric series. `git diff --check` passed.
-
-Initial changes bound incident descriptions, log payloads and metric series; reject nonnumeric/nonfinite metrics; label heuristic scores as uncalibrated; distinguish analysis completion from resolution; remove the report's universal safety assertion.
-
-The architecture upgrade is NOT complete. No provider, retrieval, LangGraph, persistence, browser, desktop, Docker or live-model validation has been completed in this implementation pass.
+See docs/requirements.md for all thirteen original specification areas, implemented behavior and limits. No public deployment or merge is authorized or performed.

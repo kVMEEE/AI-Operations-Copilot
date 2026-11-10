@@ -1,0 +1,120 @@
+{
+  "mode": "fake_test_only",
+  "category_agreement": {
+    "correct": 11,
+    "total": 11
+  },
+  "results": [
+    {
+      "id": "database",
+      "expected": "Database",
+      "actual": "Database",
+      "citation_count": 1,
+      "valid_citations": 1,
+      "schema_valid": true,
+      "verification": "passed",
+      "abstained": false
+    },
+    {
+      "id": "oom",
+      "expected": "Memory",
+      "actual": "Memory",
+      "citation_count": 1,
+      "valid_citations": 1,
+      "schema_valid": true,
+      "verification": "passed",
+      "abstained": false
+    },
+    {
+      "id": "network",
+      "expected": "Network",
+      "actual": "Network",
+      "citation_count": 1,
+      "valid_citations": 1,
+      "schema_valid": true,
+      "verification": "passed",
+      "abstained": false
+    },
+    {
+      "id": "disk",
+      "expected": "Disk",
+      "actual": "Disk",
+      "citation_count": 1,
+      "valid_citations": 1,
+      "schema_valid": true,
+      "verification": "passed",
+      "abstained": false
+    },
+    {
+      "id": "cpu",
+      "expected": "CPU",
+      "actual": "CPU",
+      "citation_count": 1,
+      "valid_citations": 1,
+      "schema_valid": true,
+      "verification": "passed",
+      "abstained": false
+    },
+    {
+      "id": "healthy",
+      "expected": "None",
+      "actual": "None",
+      "citation_count": 1,
+      "valid_citations": 1,
+      "schema_valid": true,
+      "verification": "passed",
+      "abstained": false
+    },
+    {
+      "id": "conflicting",
+      "expected": "Memory",
+      "actual": "Memory",
+      "citation_count": 1,
+      "valid_citations": 1,
+      "schema_valid": true,
+      "verification": "passed",
+      "abstained": false
+    },
+    {
+      "id": "insufficient",
+      "expected": "Unknown",
+      "actual": "Unknown",
+      "citation_count": 1,
+      "valid_citations": 1,
+      "schema_valid": true,
+      "verification": "passed",
+      "abstained": true
+    },
+    {
+      "id": "misleading",
+      "expected": "CPU",
+      "actual": "CPU",
+      "citation_count": 1,
+      "valid_citations": 1,
+      "schema_valid": true,
+      "verification": "passed",
+      "abstained": false
+    },
+    {
+      "id": "injection",
+      "expected": "Disk",
+      "actual": "Disk",
+      "citation_count": 1,
+      "valid_citations": 1,
+      "schema_valid": true,
+      "verification": "passed",
+      "abstained": false
+    },
+    {
+      "id": "missing_runbooks",
+      "expected": "Unknown",
+      "actual": "Unknown",
+      "citation_count": 1,
+      "valid_citations": 1,
+      "schema_valid": true,
+      "verification": "passed",
+      "abstained": true
+    }
+  ],
+  "limitations": "Fake provider copies rule hypotheses. This evaluates graph/schema/citation plumbing, not real-model reasoning or semantic faithfulness. Adversarial unsupported-claim rejection is tested separately in pytest."
+}
