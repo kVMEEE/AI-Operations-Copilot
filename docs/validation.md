@@ -19,3 +19,17 @@ Executed checks:
 - `git diff --check` passed. Staged files were reviewed; credential-pattern hits were redaction patterns and synthetic test values, not credentials. No generated databases, environment secrets, binaries or venv were added.
 
 Unverified: real OpenAI chat/embedding access and semantic retrieval quality (no API key), Windows build/runtime, public/multi-user operation (unsupported by design). The native/Docker/browser checks establish the tested local workflow only. They do not establish production security, scalability or accuracy.
+
+## Grounding fixes — 2026-11-11
+
+On `fix/investigation-grounding`, based on `feature/evidence-investigation`:
+
+- Runbook regressions cover heading/body edits, whole-document version refresh, unchanged-vector reuse, lexical-only invalidation, model changes and deletion.
+- Diagnostics now carry validated evidence IDs, applicable runbook citations, prerequisites and operational impact; deterministic mode covers database, memory, network, disk, CPU and insufficient/normal observations.
+- Verification tests cover unsupported categories, Unknown uncertainty/missing information, contradictions, cross-incident references, unseen citations, one successful repair and failed revisions that discard proposals.
+- Integration checks cover verified non-leading selections, bounded complete model messages/calls/duration, semantic failure/timeout lexical fallback (including tool search), and provider initialization/runtime failures preserving deterministic reports.
+- `make -C cpp_engine`: build check passed; existing native outputs were up to date. Both documented native and E2E scripts passed.
+- `.venv/bin/python -m pytest -q`: **64 passed**, including HTTP lifecycle and verified-selection response tests.
+- Real Chromium smoke on the local server passed, including category-specific diagnostics, prerequisites, operational impact, history and injection escaping. No UI redesign was made.
+- Synthetic evaluation retained 11/11 authored category agreement and 8/8 lexical document recall@4. These remain regression metrics, not production accuracy estimates.
+- `pip check` and `git diff --check` passed. No chat/embedding credential was configured; the opt-in live evaluator reported `skipped: no credentials`. Live OpenAI and embeddings remain unverified.

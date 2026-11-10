@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field, field_validator
 import math
 import re
 from typing import Literal
-from app.investigation.contracts import Investigation
+from app.investigation.contracts import Investigation, Citation
 from typing import List, Dict, Optional, Any
 from uuid import UUID
 from datetime import datetime
@@ -82,6 +82,10 @@ class RootCause(BaseModel):
     engine: Optional[str] = None
 
 class Recommendation(BaseModel):
+    evidence_ids: List[str] = Field(default_factory=list)
+    citations: List[Citation] = Field(default_factory=list)
+    prerequisites: List[str] = Field(default_factory=list)
+    operational_impact: str = "Review operational impact before proceeding."
     action: str
     description: str
     is_safe: bool = False

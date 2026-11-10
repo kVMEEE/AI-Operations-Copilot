@@ -40,20 +40,45 @@ class KnowledgeStore:
                         identity=HASH(source+':'+str(section)+':'+str(offset))[:24]
                         records.append((identity,HASH(source)[:24],source,heading,version,HASH(chunk),chunk))
         with self.connect() as db:
-            existing={r[0]:r[1:] for r in db.execute('SELECT id,hash,model,dimensions,vector FROM chunks')}
-            changed=[]
+            existing = {row[0]: row for row in db.execute('SELECT * FROM chunks')}
+            updates = []
+            to_embed = []
+            retained = {}
             for row in records:
-                old=existing.get(row[0]); needs=reindex or not old or old[0]!=row[5] or (embedder and (old[1]!=model or old[2]!=dimensions or not old[3]))
-                if needs: changed.append(row)
-            vectors=embedder.embed_documents([r[3]+'\n'+r[6] for r in changed]) if embedder and changed else [None]*len(changed)
-            if len(vectors)!=len(changed): raise ValueError('Embedding count mismatch')
-            for row,vector in zip(changed,vectors):
-                if vector is not None and (len(vector)!=dimensions or not all(math.isfinite(v) for v in vector)): raise ValueError('Invalid embedding vector')
-                db.execute('INSERT OR REPLACE INTO chunks VALUES (?,?,?,?,?,?,?,?,?,?)',(*row,json.dumps(vector) if vector is not None else None,model if vector is not None else None,dimensions if vector is not None else None))
-            keep={r[0] for r in records}
+                old = existing.get(row[0])
+                # The embedding input includes the heading, not just the body hash.
+                same_input = old is not None and (old[3] + '\n' + old[6]) == (row[3] + '\n' + row[6])
+                compatible = same_input and old[7] is not None and (model is None or old[8] == model) and (dimensions is None or old[9] == dimensions)
+                if compatible:
+                    try:
+                        vector = json.loads(old[7])
+                        compatible = len(vector) == old[9] and all(math.isfinite(v) for v in vector)
+                    except (TypeError, ValueError):
+                        compatible = False
+                if embedder is not None and (reindex or not compatible):
+                    to_embed.append(row)
+                elif compatible:
+                    retained[row[0]] = old[7:10]
+                # Refresh provenance for every document version change, even when
+                # another section changed and this chunk's vector remains reusable.
+                if old is None or old[:7] != row or (old[7] is not None and not compatible) or row in to_embed:
+                    updates.append(row)
+            vectors = embedder.embed_documents([r[3] + '\n' + r[6] for r in to_embed]) if to_embed else []
+            if len(vectors) != len(to_embed):
+                raise ValueError('Embedding count mismatch')
+            embedded = {}
+            for row, vector in zip(to_embed, vectors):
+                if len(vector) != dimensions or not all(math.isfinite(v) for v in vector):
+                    raise ValueError('Invalid embedding vector')
+                embedded[row[0]] = (json.dumps(vector), model, dimensions)
+            for row in updates:
+                vector_metadata = embedded.get(row[0], retained.get(row[0], (None, None, None)))
+                db.execute('INSERT OR REPLACE INTO chunks VALUES (?,?,?,?,?,?,?,?,?,?)', (*row, *vector_metadata))
+            keep = {row[0] for row in records}
             for identity in existing:
-                if identity not in keep: db.execute('DELETE FROM chunks WHERE id=?',(identity,))
-        return {'chunks':len(records),'updated':len(changed),'embedded':sum(v is not None for v in vectors)}
+                if identity not in keep:
+                    db.execute('DELETE FROM chunks WHERE id=?', (identity,))
+        return {'chunks': len(records), 'updated': len(updates), 'embedded': len(embedded)}
     def retrieve(self,query,k=4,budget=12000,embedder=None,model=None,dimensions=None):
         if not self.path.exists(): return [],'unavailable'
         with self.connect() as db: rows=db.execute('SELECT * FROM chunks ORDER BY id').fetchall()
@@ -71,9 +96,20 @@ class KnowledgeStore:
         if embedder:
             compatible=all(r[7] and r[8]==model and r[9]==dimensions for r in rows)
             if compatible:
-                vector=embedder.embed_query(redact(query)); semantic=sorted(((cosine(vector,json.loads(r[7])),r[0]) for r in rows),key=lambda t:(-t[0],t[1]))
-                rankings.append([i for score,i in semantic if score>0]); mode='hybrid' if lexical else 'semantic'
-            else: mode='lexical_fallback_incompatible_index'
+                try:
+                    vector = embedder.embed_query(redact(query))
+                    if len(vector) != dimensions or not all(math.isfinite(v) for v in vector):
+                        raise ValueError('Invalid query embedding')
+                    semantic = sorted(((cosine(vector, json.loads(r[7])), r[0]) for r in rows), key=lambda t: (-t[0], t[1]))
+                    if not all(math.isfinite(score) for score, _ in semantic):
+                        raise ValueError('Invalid similarity score')
+                    rankings.append([i for score, i in semantic if score > 0])
+                    mode = 'hybrid' if lexical else 'semantic'
+                except Exception:
+                    # Every caller, including tool searches, keeps lexical results.
+                    mode = 'lexical_fallback_query_failure'
+            else:
+                mode = 'lexical_fallback_incompatible_index'
         scores={}
         for ranking in rankings:
             for rank,identity in enumerate(ranking): scores[identity]=scores.get(identity,0)+1/(60+rank+1)
