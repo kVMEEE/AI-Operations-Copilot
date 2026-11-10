@@ -15,6 +15,9 @@ def main():
         assert 'deterministic' in page.locator('#modes').inner_text()
         assert 'fallback' in page.locator('#modes').inner_text()
         assert 'Database' in page.locator('#hypotheses').inner_text()
+        assert 'Inspect contention and connection evidence' in page.locator('#report').inner_text()
+        assert 'Prerequisites:' in page.locator('#report').inner_text()
+        assert 'Operational impact:' in page.locator('#report').inner_text()
         assert 'frequency' in page.locator('#evidence').inner_text()
         assert page.locator('#citations').inner_text()
         assert page.evaluate('window.injected') is None

@@ -30,8 +30,18 @@ def verify(proposal,evidence,hypotheses,chunks,incident_id):
     if any(i not in by_id or by_id[i].incident_id!=incident_id for i in refs): reasons.append('Unknown or cross-incident evidence reference')
     if any(c.chunk_id not in chunk_ids for c in proposal.citations): reasons.append('Citation was not supplied to this investigation')
     candidates={h.category:h for h in hypotheses}
+    if set(proposal.supporting) & set(proposal.contradicting):
+        reasons.append('Evidence cannot both support and contradict the selection')
+    if proposal.category == 'Unknown':
+        if proposal.uncertainty != 'high':
+            reasons.append('Unknown requires high uncertainty')
+        if not proposal.missing:
+            reasons.append('Unknown requires missing information')
+        contradictions = {ref for h in hypotheses for ref in h.contradicting}
+        if set(proposal.contradicting) != contradictions:
+            reasons.append('Unknown must preserve known contradictions')
     if proposal.category not in candidates and proposal.category!='Unknown': reasons.append('Category lacks deterministic support')
-    if proposal.category in candidates:
+    if proposal.category in candidates and proposal.category != 'Unknown':
         h=candidates[proposal.category]
         if proposal.category not in ('None','Unknown') and not set(proposal.supporting)&set(h.supporting): reasons.append('Hypothesis lacks supporting evidence')
         if not set(proposal.supporting)<=set(h.supporting): reasons.append('Supporting references do not support the selected category')
@@ -43,6 +53,43 @@ def verify(proposal,evidence,hypotheses,chunks,incident_id):
     if any(d.action_type!='read_only' for d in proposal.diagnostics): reasons.append('Diagnostic action type mismatch')
     return sorted(set(reasons))
 
+def model_context(incident_id, incident, state, chunks, budget):
+    """Pack complete JSON objects; the budget covers the entire untrusted message.
+
+    Return only chunk IDs whose contents are actually included, so retrieval alone
+    never authorizes a citation. Earlier delivered chunks remain valid snapshots.
+    """
+    context = {'incident_id': incident_id, 'revision': state.get('revision', 0),
+               'verification_errors': state.get('verification', []),
+               'hypotheses': [], 'tool_results': [], 'chunks': [], 'evidence': [],
+               'untrusted_description': ''}
+    encode = lambda: redact(json.dumps(context, ensure_ascii=False, default=str))
+    delivered = set()
+    if len(encode()) > budget:
+        raise ValueError('Context budget cannot fit investigation metadata')
+    def append(key, value):
+        context[key].append(value)
+        if len(encode()) > budget:
+            context[key].pop()
+            return False
+        return True
+    for h in state['hypotheses']:
+        append('hypotheses', h.model_dump())
+    for result in reversed(state.get('tool_results', [])[-6:]):
+        public = {k:v for k,v in result.items() if not k.startswith('_')}
+        if append('tool_results', public):
+            delivered.update(result.get('_chunk_ids', []))
+    for chunk in chunks:
+        if append('chunks', chunk.model_dump()):
+            delivered.add(chunk.id)
+    for evidence in state['evidence']:
+        append('evidence', evidence.model_dump())
+    # Context is telemetry-first; descriptions are optional untrusted background.
+    context['untrusted_description'] = incident.description[:max(0, budget-len(encode())-16)]
+    while len(encode()) > budget:
+        context['untrusted_description'] = context['untrusted_description'][:len(context['untrusted_description'])//2]
+    return encode(), delivered
+
 class Investigator:
     def __init__(self,settings,bridge,retriever,provider=None):
         self.s=settings; self.bridge=bridge;self.retriever=retriever;self.provider=provider
@@ -50,7 +97,7 @@ class Investigator:
         started=time.monotonic(); deadline=started+self.s.max_duration
         metadata=ProviderMetadata(requested=incident.mode,active=getattr(self.provider,'label','disabled'),model=self.s.chat_model if self.provider else None)
         if incident.mode=='llm' and not self.provider: metadata.error='Provider disabled or credentials unavailable'
-        seen=set(); supplied={}; trace=[]; calls=0; tools=0; steps=0
+        seen=set(); supplied={}; available={}; trace=[]; calls=0; tools=0; steps=0
         async def enter(name):
             nonlocal steps
             steps+=1
@@ -66,24 +113,37 @@ class Investigator:
                 await native_task
                 raise
             return {'findings':f,'evidence':e,'hypotheses':h,'revision':0,'tool_results':[]}
+        async def lookup(query):
+            # Isolate each request: a timed-out embedding thread must not overwrite
+            # the mode or embedder used by its lexical fallback.
+            request = self.retriever.model_copy()
+            def remaining():
+                return max(.001, min(self.s.timeout_seconds, deadline-time.monotonic()))
+            try:
+                chunks = await asyncio.wait_for(asyncio.to_thread(request.chunks, query), timeout=remaining())
+                self.retriever.mode = request.mode
+            except Exception:
+                lexical = request.model_copy(update={'embedder': None})
+                chunks = await asyncio.wait_for(asyncio.to_thread(lexical.chunks, query), timeout=remaining())
+                self.retriever.mode = 'lexical_fallback_query_failure'
+            return chunks
         async def retrieve(state):
             await enter('retrieve_context')
             query=' '.join(h.title for h in state['hypotheses'])+' '+' '.join(e.source for e in state['evidence'])
-            try: chunks=await asyncio.wait_for(asyncio.to_thread(self.retriever.chunks,query[:3000]),timeout=max(.01,min(self.s.timeout_seconds,deadline-time.monotonic())))
-            except Exception:
-                # Semantic query failure must preserve offline lexical functionality.
-                self.retriever.embedder=None
-                chunks=await asyncio.to_thread(self.retriever.chunks,query[:3000])
-                self.retriever.mode='lexical_fallback_query_failure'
-            supplied.update({c.id:c for c in chunks})
+            chunks = await lookup(query[:3000])
+            available.update({c.id:c for c in chunks})
             return {'chunks':chunks}
         async def investigate(state):
             nonlocal calls
             await enter('investigate')
             if not self.provider or incident.mode!='llm': return {'route':'verify','proposal':None}
             if calls>=self.s.max_model_calls or time.monotonic()>=deadline:
-                metadata.error='Investigation call or duration budget exhausted';return {'route':'finalize'}
-            context=json.dumps({'incident_id':incident_id,'untrusted_description':incident.description,'evidence':[e.model_dump() for e in state['evidence'][:100]],'hypotheses':[h.model_dump() for h in state['hypotheses']], 'chunks':[c.model_dump() for c in supplied.values()], 'tool_results':state.get('tool_results',[])[-6:],'verification_errors':state.get('verification',[]),'revision':state.get('revision',0)},default=str)
+                metadata.error='Investigation call or duration budget exhausted';return {'route':'finalize','proposal':None}
+            context, delivered = model_context(incident_id, incident, state, list(available.values()), self.s.context_chars)
+            supplied.update({identity:available[identity] for identity in delivered})
+            if time.monotonic() >= deadline:
+                metadata.error='Investigation duration budget exhausted'
+                return {'route':'finalize','proposal':None}
             calls+=1;metadata.calls=calls
             try:
                 decision,usage=await asyncio.wait_for(self.provider.decide(redact(context)),timeout=max(.01,min(self.s.timeout_seconds,deadline-time.monotonic())))
@@ -97,15 +157,15 @@ class Investigator:
                 metadata.error='Provider '+type(exc).__name__
                 trace.append(Trace(stage='investigate',outcome=metadata.error))
                 # One retry at most for each investigation phase, within the global call budget.
-                if state.get('revision',0)==0: return {'verification':['Provider output unavailable or invalid'],'route':'revise'}
-                return {'route':'finalize'}
+                if state.get('revision',0)==0: return {'verification':['Provider output unavailable or invalid'],'route':'revise','proposal':None}
+                return {'route':'finalize','proposal':None}
         async def execute(state):
             nonlocal tools
             await enter('execute_tools'); results=[]
             for call in state['decision'].tools:
                 key=call.model_dump_json()
                 if tools>=self.s.max_tool_calls or time.monotonic()>=deadline:
-                    metadata.error='Tool or duration budget exhausted';return {'route':'finalize'}
+                    metadata.error='Tool or duration budget exhausted';return {'route':'finalize','proposal':None}
                 tools+=1;metadata.tool_calls=tools
                 try:
                     if call.incident_id!=incident_id: raise ValueError('Incident ownership mismatch')
@@ -120,22 +180,34 @@ class Investigator:
                     elif call.name=='get_rule_hypotheses': data=[h.model_dump() for h in state['hypotheses']]
                     elif call.name=='search_runbooks':
                         if not call.query: raise ValueError('Search query required')
-                        chunks=await asyncio.wait_for(asyncio.to_thread(self.retriever.chunks,call.query),timeout=max(.01,min(self.s.timeout_seconds,deadline-time.monotonic())))
+                        chunks=await lookup(call.query)
                         # Total supplied context remains bounded across tool calls.
                         for c in chunks:
-                            if c.id not in supplied and sum(len(v.content) for v in supplied.values())+len(c.content)<=self.s.context_chars: supplied[c.id]=c
-                        data=[c.model_dump() for c in chunks if c.id in supplied]
+                            if c.id not in available and sum(len(v.content) for v in available.values())+len(c.content)<=self.s.context_chars:
+                                available[c.id]=c
+                        data=[available[c.id].model_dump() for c in chunks if c.id in available]
                     else:
                         if call.reference_id not in supplied: raise ValueError('Chunk was not retrieved for this incident')
                         data=supplied[call.reference_id].model_dump()
+                    # Complete items only: never authorize a partially delivered chunk.
+                    if isinstance(data, list):
+                        while data and len(json.dumps(data)) > min(6000, self.s.context_chars//2):
+                            data.pop()
                     text=json.dumps(data,default=str)
-                    if len(text)>6000: text=text[:6000]+' [response truncated]'
-                    results.append({'tool':call.name,'result':text})
+                    chunk_ids = []
+                    if call.name == 'search_runbooks':
+                        chunk_ids = [item['id'] for item in data]
+                    elif call.name == 'get_runbook_chunk':
+                        chunk_ids = [call.reference_id]
+                    if len(text)>6000:
+                        text='Response exceeds tool budget; request a narrower reference.'
+                        chunk_ids=[]
+                    results.append({'tool':call.name,'result':text,'_chunk_ids':chunk_ids})
                     trace.append(Trace(stage='execute_tools',outcome=call.name+' completed',reference=call.reference_id or None))
                 except Exception as exc:
                     results.append({'tool':call.name,'error':type(exc).__name__})
                     trace.append(Trace(stage='execute_tools',outcome=call.name+' rejected'))
-            return {'tool_results':state.get('tool_results',[])+results,'chunks':list(supplied.values()),'route':'investigate'}
+            return {'tool_results':state.get('tool_results',[])+results,'chunks':list(available.values()),'route':'investigate'}
         async def verify_node(state):
             await enter('verify')
             if state.get('proposal') is None and (not self.provider or incident.mode!='llm'):
@@ -170,4 +242,4 @@ class Investigator:
         if not assisted: proposal=None
         metadata.active=getattr(self.provider,'label','disabled') if assisted else 'deterministic'
         metadata.elapsed_ms=(time.monotonic()-started)*1000
-        return Investigation(evidence=latest['evidence'],findings=latest['findings'],hypotheses=latest['hypotheses'],chunks=list(supplied.values()),citations=proposal.citations if proposal else [],proposal=proposal,verification=Verification(status='passed' if assisted or incident.mode=='deterministic' else 'fallback',reasons=reasons+latest.get('verification',[])+([metadata.error] if metadata.error else [])+(['Provider proposal rejected'] if latest.get('verification') and not assisted else [])),provider=metadata,retrieval_mode=self.retriever.mode,trace=trace)
+        return Investigation(evidence=latest['evidence'],findings=latest['findings'],hypotheses=latest['hypotheses'],chunks=list(supplied.values()) if self.provider and incident.mode=='llm' else list(available.values()),citations=proposal.citations if proposal else [],proposal=proposal,verification=Verification(status='passed' if assisted or incident.mode=='deterministic' else 'fallback',reasons=reasons+latest.get('verification',[])+([metadata.error] if metadata.error else [])+(['Provider proposal rejected'] if latest.get('verification') and not assisted else [])),provider=metadata,retrieval_mode=self.retriever.mode,trace=trace)

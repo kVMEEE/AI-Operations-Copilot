@@ -29,14 +29,21 @@ class PlannerAgent:
         try:
             async with self.semaphore:
                 self.store.update(identity,status='processing',step='initializing')
-                provider=None;embedder=None
+                provider=None;embedder=None;provider_setup_error=None
                 if incident.mode=='llm':
                     provider=self.provider_override
                     if provider is None and self.settings.provider=='openai' and self.settings.key():
                         from app.llm.client import OpenAIProvider,embeddings
-                        provider=OpenAIProvider(self.settings);embedder=embeddings(self.settings)
+                        try:
+                            provider=OpenAIProvider(self.settings);embedder=embeddings(self.settings)
+                        except Exception as exc:
+                            provider=None;embedder=None
+                            provider_setup_error='Provider initialization '+type(exc).__name__
                 retriever=OperationalRetriever(store=KnowledgeStore(self.settings.knowledge_db,self.settings.knowledge_dir),embedder=embedder,model=self.settings.embedding_model,dimensions=self.settings.embedding_dimensions,top_k=self.settings.top_k,budget=self.settings.context_chars)
                 inv=await Investigator(self.settings,cpp_bridge,retriever,provider).run(identity,incident,lambda stage:self.store.update(identity,step=stage))
+                if provider_setup_error:
+                    inv.provider.error=provider_setup_error
+                    inv.verification.reasons.append(provider_setup_error)
                 self.store.update(identity,status='completed',step='done',result=report(incident,inv))
         except asyncio.CancelledError:
             self.store.update(identity,status='cancelled',step='cancelled');raise
