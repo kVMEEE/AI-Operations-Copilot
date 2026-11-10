@@ -16,6 +16,7 @@ Continued on `feature/evidence-investigation`, preserving initial commit `5c6cb5
 - [x] Architecture, setup, security, limits and requirement reconciliation documentation
 - [ ] Live provider/embedding service verification — blocked: no API credentials
 - [ ] Windows execution — unavailable in this Linux environment
-- [ ] Final commit, push and draft PR — delivery results recorded at completion
+- [x] Final implementation committed as d6fc275 and pushed to origin/feature/evidence-investigation
+- [ ] Draft PR creation — blocked: GitHub GraphQL returned Forbidden; attempted with gh pr create --draft. Reviewable text is in docs/pull-request.md.
 
 See docs/requirements.md for all thirteen original specification areas, implemented behavior and limits. No public deployment or merge is authorized or performed.
